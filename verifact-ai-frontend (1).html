@@ -1,0 +1,2003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VeriFactAI — AI Misinformation Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050810;
+  --surface: #0b1120;
+  --surface2: #101828;
+  --border: rgba(99,179,237,0.12);
+  --border2: rgba(99,179,237,0.25);
+  --cyan: #00e5ff;
+  --cyan2: #63b3ed;
+  --green: #00ff9d;
+  --red: #ff3d6b;
+  --amber: #ffb340;
+  --purple: #a78bfa;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --font-display: 'Syne', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+  --api: http://localhost:8000/api/v1;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-display);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Grid background ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Glow orbs ── */
+.orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(120px);
+  pointer-events: none;
+  z-index: 0;
+}
+.orb1 { width: 600px; height: 600px; background: rgba(0,229,255,0.06); top: -200px; right: -200px; }
+.orb2 { width: 400px; height: 400px; background: rgba(167,139,250,0.05); bottom: 0; left: -150px; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── Nav ── */
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(5,8,16,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+
+.nav-logo .shield {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, var(--cyan), var(--purple));
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.nav-links {
+  display: flex;
+  gap: 4px;
+  list-style: none;
+}
+
+.nav-links a {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all .2s;
+  letter-spacing: .03em;
+}
+.nav-links a:hover { color: var(--cyan); background: rgba(0,229,255,0.05); }
+
+.api-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: pulse 2s infinite;
+}
+.status-dot.online { background: var(--green); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── Hero ── */
+.hero {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 80px 2rem 60px;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  color: var(--cyan);
+  border: 1px solid rgba(0,229,255,0.3);
+  padding: 6px 16px;
+  border-radius: 100px;
+  margin-bottom: 24px;
+  background: rgba(0,229,255,0.05);
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  line-height: 1.05;
+  letter-spacing: -2px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #fff 0%, #63b3ed 50%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-sub {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 520px;
+  margin: 0 auto 40px;
+  line-height: 1.7;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.stat-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 20px;
+  text-align: center;
+}
+
+.stat-chip .num {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--cyan);
+  display: block;
+}
+
+.stat-chip .label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* ── Section layout ── */
+.main-container {
+  position: relative;
+  z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1.5rem 6rem;
+}
+
+.section {
+  margin-bottom: 4rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.section-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cyan);
+  border: 1px solid rgba(0,229,255,0.3);
+  border-radius: 4px;
+  padding: 2px 8px;
+  letter-spacing: .05em;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.5px;
+}
+
+.section-desc {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.6;
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.card:hover { border-color: var(--border2); }
+
+.card-inner { padding: 1.5rem; }
+
+/* ── Feature badge ── */
+.feature-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  letter-spacing: .05em;
+  font-weight: 700;
+}
+.badge-post { background: rgba(0,229,255,0.1); color: var(--cyan); border: 1px solid rgba(0,229,255,0.2); }
+.badge-get { background: rgba(0,255,157,0.1); color: var(--green); border: 1px solid rgba(0,255,157,0.2); }
+.badge-unique { background: rgba(167,139,250,0.1); color: var(--purple); border: 1px solid rgba(167,139,250,0.2); }
+
+.endpoint-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+/* ── Inputs ── */
+label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .06em;
+  margin-bottom: 6px;
+}
+
+input[type=text], input[type=url], textarea, select {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+  transition: border-color .2s;
+  margin-bottom: 12px;
+  resize: vertical;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--cyan); }
+select option { background: var(--surface2); }
+
+input[type=file] {
+  display: none;
+}
+
+.file-drop {
+  border: 1px dashed var(--border2);
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  margin-bottom: 12px;
+  background: var(--surface2);
+}
+.file-drop:hover { border-color: var(--cyan); background: rgba(0,229,255,0.03); }
+.file-drop .drop-icon { font-size: 24px; margin-bottom: 8px; }
+.file-drop .drop-text { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.file-drop.has-file { border-color: var(--green); }
+.file-drop.has-file .drop-text { color: var(--green); }
+
+/* ── Buttons ── */
+.btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all .15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-primary {
+  background: var(--cyan);
+  color: #050810;
+}
+.btn-primary:hover { background: #33eaff; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border2);
+}
+.btn-secondary:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* ── Result panel ── */
+.result-panel {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+  display: none;
+}
+.result-panel.visible { display: block; }
+
+/* ── Verdict badge ── */
+.verdict-big {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: .1em;
+  margin-bottom: 1rem;
+}
+.verdict-FAKE { background: rgba(255,61,107,0.15); color: var(--red); border: 1px solid rgba(255,61,107,0.3); }
+.verdict-TRUE { background: rgba(0,255,157,0.1); color: var(--green); border: 1px solid rgba(0,255,157,0.25); }
+.verdict-MISLEADING { background: rgba(255,179,64,0.12); color: var(--amber); border: 1px solid rgba(255,179,64,0.3); }
+.verdict-UNVERIFIED { background: rgba(100,116,139,0.15); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
+.verdict-SATIRE { background: rgba(167,139,250,0.12); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+
+/* ── Risk meter ── */
+.risk-container { margin: 1rem 0; }
+.risk-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.risk-track {
+  height: 8px;
+  background: var(--surface2);
+  border-radius: 100px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.risk-fill {
+  height: 100%;
+  border-radius: 100px;
+  transition: width 1s cubic-bezier(.4,0,.2,1);
+}
+
+/* ── Info grid ── */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 1rem 0;
+}
+
+.info-cell {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.info-cell .val {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cyan);
+}
+.info-cell .lbl {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* ── Counter panel ── */
+.counter-card {
+  background: rgba(0,229,255,0.03);
+  border: 1px solid rgba(0,229,255,0.12);
+  border-radius: 12px;
+  padding: 1.2rem;
+  margin-top: .75rem;
+}
+.counter-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  color: var(--cyan);
+  margin-bottom: .6rem;
+  text-transform: uppercase;
+}
+.counter-text {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+}
+.issue-list {
+  list-style: none;
+  margin-top: .5rem;
+}
+.issue-list li {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.issue-list li::before { content: '›'; color: var(--red); flex-shrink: 0; }
+
+/* ── Explainability bars ── */
+.explain-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.explain-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  width: 180px;
+  flex-shrink: 0;
+}
+.explain-track {
+  flex: 1;
+  height: 4px;
+  background: var(--surface2);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.explain-fill {
+  height: 100%;
+  background: var(--cyan);
+  border-radius: 100px;
+  transition: width 1.2s cubic-bezier(.4,0,.2,1);
+}
+.explain-val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cyan);
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Detection signals ── */
+.signals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: .75rem 0;
+}
+.signal-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.signal-name { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.signal-val { font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
+
+/* ── Loading ── */
+.loader {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 1rem 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--cyan);
+}
+.loader.active { display: flex; }
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Error ── */
+.error-box {
+  background: rgba(255,61,107,0.08);
+  border: 1px solid rgba(255,61,107,0.25);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--red);
+  margin-top: 1rem;
+  display: none;
+}
+.error-box.visible { display: block; }
+
+/* ── Trending table ── */
+.trend-item {
+  display: grid;
+  grid-template-columns: 1fr 80px 60px 60px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.trend-item:last-child { border-bottom: none; }
+.trend-claim { color: var(--text); line-height: 1.4; }
+.trend-hits { color: var(--cyan); text-align: right; }
+.trend-score { text-align: right; }
+.trend-hdr {
+  display: grid;
+  grid-template-columns: 1fr 80px 60px 60px;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border2);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+/* ── Virality meter ── */
+.virality-display {
+  text-align: center;
+  padding: 1.5rem 0 1rem;
+}
+.virality-score-big {
+  font-family: var(--font-mono);
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.virality-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ── Network nodes ── */
+.network-container {
+  min-height: 120px;
+}
+.network-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.similarity-bar {
+  width: 60px;
+  height: 4px;
+  background: var(--surface2);
+  border-radius: 100px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.similarity-fill {
+  height: 100%;
+  background: var(--purple);
+  border-radius: 100px;
+}
+
+/* ── Sources grid ── */
+.sources-grid {
+  display: grid;
+  gap: 8px;
+}
+.source-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+.source-name { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+.source-desc { font-family: var(--font-mono); font-size: 11px; color: var(--muted); line-height: 1.5; }
+.priority-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(0,229,255,0.1);
+  color: var(--cyan);
+  margin-bottom: 6px;
+}
+
+/* ── Templates grid ── */
+.template-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* ── Raw JSON viewer ── */
+.json-toggle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 0;
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+}
+.json-toggle:hover { color: var(--cyan); }
+.raw-json {
+  display: none;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #94a3b8;
+  overflow-x: auto;
+  margin-top: 8px;
+  white-space: pre;
+  max-height: 300px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+
+/* ── Divider ── */
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 3rem 0;
+}
+
+/* ── Row layouts ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } .trend-item, .trend-hdr { grid-template-columns: 1fr 60px; } .trend-hits, .trend-score { display: none; } .signals-grid { grid-template-columns: 1fr; } }
+
+/* ── Footer ── */
+footer {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--border);
+  padding: 2rem;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+</style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="shield">🛡</div>
+    VeriFactAI
+  </div>
+  <ul class="nav-links">
+    <li><a href="#analyze">Analyze</a></li>
+    <li><a href="#multimodal">Multimodal</a></li>
+    <li><a href="#factcheck">Fact Check</a></li>
+    <li><a href="#counter">Counter</a></li>
+    <li><a href="#trending">Trending</a></li>
+    <li><a href="#unique">Unique</a></li>
+  </ul>
+  <div class="api-status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">checking...</span>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">
+    <span style="width:6px;height:6px;background:var(--green);border-radius:50%;display:inline-block"></span>
+    AI-POWERED MISINFORMATION DETECTION
+  </div>
+  <h1>Stop the Spread.<br>Build the Truth.</h1>
+  <p class="hero-sub">Real-time multimodal fact-checking across text, image, audio & video — in English, Hindi & Tamil.</p>
+  <div class="stats-row">
+    <div class="stat-chip"><span class="num">14+</span><span class="label">seeded claims</span></div>
+    <div class="stat-chip"><span class="num">4</span><span class="label">fact sources</span></div>
+    <div class="stat-chip"><span class="num">3</span><span class="label">languages</span></div>
+    <div class="stat-chip"><span class="num">&lt;100ms</span><span class="label">cached response</span></div>
+    <div class="stat-chip"><span class="num">16</span><span class="label">API endpoints</span></div>
+  </div>
+</div>
+
+<div class="main-container">
+
+<!-- ─── SECTION 1: TEXT ANALYSIS ─── -->
+<div class="section" id="analyze">
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <div>
+      <div class="section-title">Text Analysis</div>
+      <div class="section-desc">POST /api/v1/analyze — Full pipeline: clean → detect language → extract claim → fact-check → score → counter-narrative</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-inner">
+      <div class="feature-badges">
+        <span class="badge badge-post">POST</span>
+        <span class="badge badge-get" style="background:rgba(0,255,157,0.06)">Qdrant cached</span>
+        <span class="badge badge-get" style="background:rgba(0,255,157,0.06)">Multilingual</span>
+      </div>
+      <p class="section-desc" style="margin-bottom:1rem">Enter any claim, news headline, or WhatsApp forward. Supports English, Hindi (हिंदी), and Tamil (தமிழ்). The system auto-detects the language, translates if needed, extracts the core factual claim, and runs a multi-source fact-check. Results include a risk score 0–100, explainability breakdown, and an active counter-narrative.</p>
+
+      <label>CLAIM / TEXT TO ANALYSE</label>
+      <textarea id="analyzeText" rows="4" placeholder="e.g. 5G towers spread COVID-19 through electromagnetic radiation...
+
+Or in Hindi: भारत सरकार ने अगले सोमवार से सभी 500 रुपये के नोट बंद करने का ऐलान किया है।"></textarea>
+
+      <label>RESPONSE LANGUAGE</label>
+      <select id="analyzeLang">
+        <option value="en">English</option>
+        <option value="hi">Hindi (हिंदी)</option>
+        <option value="ta">Tamil (தமிழ்)</option>
+      </select>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="runAnalyze()">
+          <span>▶</span> Analyse Claim
+        </button>
+        <button class="btn btn-secondary" onclick="fillSample('analyze','fake')">Sample (Fake)</button>
+        <button class="btn btn-secondary" onclick="fillSample('analyze','true')">Sample (True)</button>
+        <button class="btn btn-secondary" onclick="fillSample('analyze','hindi')">Sample (Hindi)</button>
+      </div>
+
+      <div class="loader" id="analyzeLoader"><div class="spinner"></div>Running full pipeline...</div>
+      <div class="error-box" id="analyzeError"></div>
+
+      <div class="result-panel" id="analyzeResult">
+        <div id="analyzeResultContent"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SECTION 2: URL ANALYSIS ─── -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <div>
+      <div class="section-title">URL Article Analysis</div>
+      <div class="section-desc">POST /api/v1/analyze/url — Fetch a news article from any URL and run the full fact-check pipeline on its content</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-inner">
+      <div class="feature-badges">
+        <span class="badge badge-post">POST</span>
+      </div>
+      <p class="section-desc" style="margin-bottom:1rem">Paste a link to any news article, blog post, or webpage. VeriFactAI fetches the content, strips ads and navigation, extracts the main article text, and runs the full analysis pipeline — including deepfake signals and counter-narrative generation.</p>
+
+      <label>NEWS ARTICLE URL</label>
+      <input type="url" id="urlInput" placeholder="https://example.com/article-about-something">
+
+      <label>RESPONSE LANGUAGE</label>
+      <select id="urlLang">
+        <option value="en">English</option>
+        <option value="hi">Hindi</option>
+        <option value="ta">Tamil</option>
+      </select>
+
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="runUrlAnalyze()">▶ Fetch & Analyse</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('urlInput').value='https://www.bbc.com/news/world-asia-india'">Sample URL</button>
+      </div>
+
+      <div class="loader" id="urlLoader"><div class="spinner"></div>Fetching article...</div>
+      <div class="error-box" id="urlError"></div>
+      <div class="result-panel" id="urlResult"><div id="urlResultContent"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SECTION 3: BATCH ─── -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <div>
+      <div class="section-title">Batch Analysis</div>
+      <div class="section-desc">POST /api/v1/analyze/batch — Analyse up to 5 claims at once, each run independently through the full pipeline</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-inner">
+      <div class="feature-badges">
+        <span class="badge badge-post">POST</span>
+      </div>
+      <p class="section-desc" style="margin-bottom:1rem">Enter up to 5 claims, one per line. Each claim runs through the complete pipeline independently. Useful for checking multiple related claims from a single article or WhatsApp group. Returns a full AnalysisResponse for each claim.</p>
+
+      <label>CLAIMS (ONE PER LINE, MAX 5)</label>
+      <textarea id="batchText" rows="6" placeholder="Vaccines cause autism in children&#10;5G towers spread coronavirus&#10;India launched Chandrayaan-3 in 2023"></textarea>
+
+      <label>RESPONSE LANGUAGE</label>
+      <select id="batchLang">
+        <option value="en">English</option>
+        <option value="hi">Hindi</option>
+        <option value="ta">Tamil</option>
+      </select>
+
+      <button class="btn btn-primary" onclick="runBatch()">▶ Analyse All Claims</button>
+
+      <div class="loader" id="batchLoader"><div class="spinner"></div>Processing batch...</div>
+      <div class="error-box" id="batchError"></div>
+      <div class="result-panel" id="batchResult"><div id="batchResultContent"></div></div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ─── SECTION 4: MULTIMODAL ─── -->
+<div class="section" id="multimodal">
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <div>
+      <div class="section-title">Multimodal Detection</div>
+      <div class="section-desc">Image / Audio / Video — deepfake detection + transcription + full fact-check pipeline</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <!-- Image -->
+    <div class="card">
+      <div class="card-inner">
+        <div class="feature-badges"><span class="badge badge-post">POST</span><span class="badge" style="background:rgba(167,139,250,0.1);color:var(--purple);border:1px solid rgba(167,139,250,0.2)">EfficientNet-B4</span></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:6px">Image Analysis</div>
+        <p class="section-desc" style="margin-bottom:1rem">/api/v1/analyze/image — Two modes:<br>
+<span style="color:var(--cyan)">Without caption:</span> deepfake-only scan via EfficientNet-B4. Returns manipulation probability — no invented claim.<br>
+<span style="color:var(--amber)">With caption:</span> deepfake scan + full fact-check of the caption/headline you provide.</p>
+<div id="imageModeIndicator" style="font-family:var(--font-mono);font-size:11px;padding:6px 12px;border-radius:8px;margin-bottom:12px;background:rgba(0,229,255,0.06);border:1px solid rgba(0,229,255,0.2);color:var(--cyan)">
+  Mode: <span id="imageModeText">Deepfake-only scan</span>
+</div>
+
+        <div class="file-drop" id="imageDrop" onclick="document.getElementById('imageFile').click()">
+          <div class="drop-icon">🖼</div>
+          <div class="drop-text" id="imageDropText">Click to upload image (JPEG, PNG, WebP)</div>
+        </div>
+        <input type="file" id="imageFile" accept="image/*" onchange="fileSelected('image')">
+
+        <label>CAPTION / CLAIM ABOUT THE IMAGE (OPTIONAL)</label>
+        <input type="text" id="imageCaption" placeholder="e.g. PM Modi announced free electricity for all Indians" oninput="updateImageMode()">
+
+        <label>RESPONSE LANGUAGE</label>
+        <select id="imageLang">
+          <option value="en">English</option>
+          <option value="hi">Hindi</option>
+          <option value="ta">Tamil</option>
+        </select>
+
+        <button class="btn btn-primary" onclick="runImageAnalyze()" id="imageAnalyzeBtn">▶ Analyse Image</button>
+        <div class="loader" id="imageLoader"><div class="spinner"></div>Running analysis...</div>
+        <div class="error-box" id="imageError"></div>
+        <div class="result-panel" id="imageResult"><div id="imageResultContent"></div></div>
+      </div>
+    </div>
+
+    <!-- Audio -->
+    <div class="card">
+      <div class="card-inner">
+        <div class="feature-badges"><span class="badge badge-post">POST</span><span class="badge" style="background:rgba(0,255,157,0.06);color:var(--green);border:1px solid rgba(0,255,157,0.2)">Whisper ASR</span></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:6px">Audio Analysis</div>
+        <p class="section-desc" style="margin-bottom:1rem">/api/v1/analyze/audio — Upload a WAV, MP3, or OGG file (e.g. a WhatsApp voice forward). OpenAI Whisper transcribes the speech to text, detects the language (Hindi/Tamil/English), and runs the full fact-check pipeline on the transcription.</p>
+
+        <div class="file-drop" id="audioDrop" onclick="document.getElementById('audioFile').click()">
+          <div class="drop-icon">🎙</div>
+          <div class="drop-text" id="audioDropText">Click to upload audio (WAV, MP3, OGG)</div>
+        </div>
+        <input type="file" id="audioFile" accept="audio/*" onchange="fileSelected('audio')">
+
+        <label>RESPONSE LANGUAGE</label>
+        <select id="audioLang">
+          <option value="en">English</option>
+          <option value="hi">Hindi</option>
+          <option value="ta">Tamil</option>
+        </select>
+
+        <button class="btn btn-primary" onclick="runAudioAnalyze()">▶ Transcribe & Analyse</button>
+        <div class="loader" id="audioLoader"><div class="spinner"></div>Transcribing with Whisper...</div>
+        <div class="error-box" id="audioError"></div>
+        <div class="result-panel" id="audioResult"><div id="audioResultContent"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:1rem">
+    <!-- Video -->
+    <div class="card">
+      <div class="card-inner">
+        <div class="feature-badges"><span class="badge badge-post">POST</span><span class="badge" style="background:rgba(167,139,250,0.1);color:var(--purple);border:1px solid rgba(167,139,250,0.2)">EfficientNet-B4</span><span class="badge" style="background:rgba(0,255,157,0.06);color:var(--green);border:1px solid rgba(0,255,157,0.2)">Whisper ASR</span></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:6px">Video Analysis</div>
+        <p class="section-desc" style="margin-bottom:1rem">/api/v1/analyze/video — Upload MP4 or WebM. Samples 10 frames at equal intervals for deepfake detection, then transcribes the audio track with Whisper. Both the visual deepfake score and the audio transcript are analysed. A caption or claim about the video can also be provided.</p>
+
+        <div class="two-col">
+          <div>
+            <div class="file-drop" id="videoDrop" onclick="document.getElementById('videoFile').click()">
+              <div class="drop-icon">🎬</div>
+              <div class="drop-text" id="videoDropText">Click to upload video (MP4, WebM)</div>
+            </div>
+            <input type="file" id="videoFile" accept="video/*" onchange="fileSelected('video')">
+          </div>
+          <div>
+            <label>CAPTION / CLAIM ABOUT THE VIDEO</label>
+            <input type="text" id="videoCaption" placeholder="e.g. Viral video claiming PM announced new scheme">
+            <label>RESPONSE LANGUAGE</label>
+            <select id="videoLang"><option value="en">English</option><option value="hi">Hindi</option><option value="ta">Tamil</option></select>
+            <button class="btn btn-primary" style="width:100%" onclick="runVideoAnalyze()">▶ Analyse Video</button>
+          </div>
+        </div>
+        <div class="loader" id="videoLoader"><div class="spinner"></div>Analysing video frames...</div>
+        <div class="error-box" id="videoError"></div>
+        <div class="result-panel" id="videoResult"><div id="videoResultContent"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick detectors -->
+  <div class="two-col" style="margin-top:1rem">
+    <div class="card">
+      <div class="card-inner">
+        <div class="feature-badges"><span class="badge badge-post">POST</span></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:6px">Quick Deepfake Check</div>
+        <p class="section-desc" style="margin-bottom:1rem">/api/v1/detect/deepfake — Lightweight endpoint. Returns only the deepfake probability score without running the full fact-check pipeline. Fastest way to get a deepfake verdict on an image.</p>
+        <div class="file-drop" id="deepfakeDrop" onclick="document.getElementById('deepfakeFile').click()">
+          <div class="drop-icon">🔍</div>
+          <div class="drop-text" id="deepfakeDropText">Upload image for quick deepfake check</div>
+        </div>
+        <input type="file" id="deepfakeFile" accept="image/*" onchange="fileSelected('deepfake')">
+        <button class="btn btn-primary" onclick="runDeepfake()">▶ Check Deepfake</button>
+        <div class="loader" id="deepfakeLoader"><div class="spinner"></div>Scanning...</div>
+        <div class="error-box" id="deepfakeError"></div>
+        <div class="result-panel" id="deepfakeResult"><div id="deepfakeResultContent"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-inner">
+        <div class="feature-badges"><span class="badge badge-post">POST</span></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:6px">Quick AI Text Check</div>
+        <p class="section-desc" style="margin-bottom:1rem">/api/v1/detect/ai-text — Uses RoBERTa-base-openai-detector to check if text was written by an AI. Returns AI-generated probability without running the full fact-check. Useful for checking if a news article or social post is AI-generated.</p>
+        <label>TEXT TO CHECK</label>
+        <textarea id="aiTextInput" rows="4" placeholder="Paste the text you want to check for AI generation...&#10;&#10;AI-generated text often has: uniform sentence lengths, phrases like 'it is important to note', 'in conclusion', 'furthermore'..."></textarea>
+        <button class="btn btn-primary" onclick="runAiText()">▶ Check AI Text</button>
+        <div class="loader" id="aiTextLoader"><div class="spinner"></div>Analysing...</div>
+        <div class="error-box" id="aiTextError"></div>
+        <div class="result-panel" id="aiTextResult"><div id="aiTextResultContent"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ─── SECTION 5: FACT CHECK ─── -->
+<div class="section" id="factcheck">
+  <div class="section-header">
+    <span class="section-num">05</span>
+    <div>
+      <div class="section-title">Direct Fact Check</div>
+      <div class="section-desc">POST /api/v1/fact-check — Multi-source verification pipeline without counter-narrative or risk scoring</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-inner">
+        <div class="feature-badges"><span class="badge badge-post">POST</span></div>
+        <p class="section-desc" style="margin-bottom:1rem">Runs only the fact verification step: Google Fact Check API → Wikipedia + NLI entailment → Serper search + NLI → standalone BART-MNLI fallback. Returns verdict, confidence score, explanation, and source URLs. Faster than /analyze since it skips detection signals and counter-narrative.</p>
+
+        <label>CLAIM TO FACT-CHECK</label>
+        <textarea id="factText" rows="3" placeholder="e.g. Drinking cow urine cures coronavirus"></textarea>
+
+        <label>CLAIM LANGUAGE</label>
+        <select id="factLang">
+          <option value="en">English</option>
+          <option value="hi">Hindi</option>
+          <option value="ta">Tamil</option>
+        </select>
+
+        <button class="btn btn-primary" onclick="runFactCheck()">▶ Fact Check</button>
+        <div class="loader" id="factLoader"><div class="spinner"></div>Verifying...</div>
+        <div class="error-box" id="factError"></div>
+        <div class="result-panel" id="factResult"><div id="factResultContent"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-inner">
+        <div class="feature-badges"><span class="badge badge-get">GET</span></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:.5rem">Fact-Check Sources</div>
+        <p class="section-desc" style="margin-bottom:1rem">/api/v1/fact-check/sources — Lists all sources used in the verification pipeline, their priority order, and description. Useful for understanding how the system arrives at a verdict.</p>
+        <button class="btn btn-primary" onclick="runFactSources()">▶ Load Sources</button>
+        <div class="loader" id="factSourcesLoader"><div class="spinner"></div>Loading...</div>
+        <div class="result-panel" id="factSourcesResult" style="margin-top:.75rem"><div id="factSourcesContent"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ─── SECTION 6: COUNTER ─── -->
+<div class="section" id="counter">
+  <div class="section-header">
+    <span class="section-num">06</span>
+    <div>
+      <div class="section-title">Counter-Narrative Generator</div>
+      <div class="section-desc">POST /api/v1/counter — The "twist" feature. Generates structured, verified counter-narratives powered by Claude or rule-based templates</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-inner">
+        <div class="feature-badges"><span class="badge badge-post">POST</span><span class="badge badge-unique">Claude-powered</span></div>
+        <p class="section-desc" style="margin-bottom:1rem">Doesn't just flag misinformation — generates a structured response with: a trusted 2-sentence summary, 2–4 specific inconsistencies in the claim, verified alternative information, actionable advice, and citations. Response can be in Hindi, Tamil, or English.</p>
+
+        <label>CLAIM</label>
+        <input type="text" id="counterClaim" placeholder="e.g. COVID vaccines cause infertility in women">
+
+        <label>VERDICT</label>
+        <select id="counterVerdict">
+          <option value="FAKE">FAKE</option>
+          <option value="MISLEADING">MISLEADING</option>
+          <option value="TRUE">TRUE</option>
+          <option value="UNVERIFIED">UNVERIFIED</option>
+          <option value="SATIRE">SATIRE</option>
+        </select>
+
+        <label>KNOWN SOURCES (COMMA-SEPARATED, OPTIONAL)</label>
+        <input type="text" id="counterSources" placeholder="WHO, CDC, ICMR">
+
+        <label>RESPONSE LANGUAGE</label>
+        <select id="counterLang">
+          <option value="en">English</option>
+          <option value="hi">Hindi</option>
+          <option value="ta">Tamil</option>
+        </select>
+
+        <button class="btn btn-primary" onclick="runCounter()">▶ Generate Counter-Narrative</button>
+        <div class="loader" id="counterLoader"><div class="spinner"></div>Generating...</div>
+        <div class="error-box" id="counterError"></div>
+        <div class="result-panel" id="counterResult"><div id="counterResultContent"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-inner">
+        <div class="feature-badges"><span class="badge badge-get">GET</span></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:.5rem">Counter-Narrative Templates</div>
+        <p class="section-desc" style="margin-bottom:1rem">/api/v1/counter/templates — View all verdict types (FAKE, MISLEADING, TRUE, UNVERIFIED, SATIRE) and the type of counter-narrative each produces. Includes supported response languages per template.</p>
+        <button class="btn btn-primary" onclick="runCounterTemplates()">▶ Load Templates</button>
+        <div class="loader" id="counterTplLoader"><div class="spinner"></div>Loading...</div>
+        <div class="result-panel" id="counterTplResult" style="margin-top:.75rem"><div id="counterTplContent"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ─── SECTION 7: TRENDING ─── -->
+<div class="section" id="trending">
+  <div class="section-header">
+    <span class="section-num">07</span>
+    <div>
+      <div class="section-title">🔥 Trending Misinformation</div>
+      <div class="section-desc">GET /api/v1/trending — Most-searched claims from Qdrant, ranked by hit count. Run some /analyze calls first to populate.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-inner">
+      <div class="feature-badges"><span class="badge badge-get">GET</span><span class="badge badge-unique">Unique Feature</span></div>
+      <p class="section-desc" style="margin-bottom:1rem">Every time a claim is checked, its Qdrant hit_count increments. This endpoint ranks all indexed claims by how often they've been searched — revealing what misinformation is actively circulating right now. This is a real-time misinformation pulse for India.</p>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px">
+          <label style="margin-bottom:0">LIMIT:</label>
+          <input type="text" id="trendingLimit" value="10" style="width:70px;margin-bottom:0">
+        </div>
+        <button class="btn btn-primary" onclick="runTrending()">▶ Load Trending</button>
+        <button class="btn btn-secondary" onclick="runStats()">📊 Load Stats</button>
+      </div>
+
+      <div class="loader" id="trendingLoader"><div class="spinner"></div>Fetching trending claims...</div>
+      <div class="error-box" id="trendingError"></div>
+      <div class="result-panel" id="trendingResult"><div id="trendingResultContent"></div></div>
+
+      <!-- Stats section -->
+      <div class="result-panel" id="statsResult" style="margin-top:0"><div id="statsContent"></div></div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ─── SECTION 8: UNIQUE FEATURES ─── -->
+<div class="section" id="unique">
+  <div class="section-header">
+    <span class="section-num">08</span>
+    <div>
+      <div class="section-title">Unique AI Features</div>
+      <div class="section-desc">Virality prediction, narrative network analysis — features no other fact-checking platform has</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <!-- Virality -->
+    <div class="card">
+      <div class="card-inner">
+        <div class="feature-badges"><span class="badge badge-post">POST</span><span class="badge badge-unique">Unique</span></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:6px">🚀 Virality Prediction</div>
+        <p class="section-desc" style="margin-bottom:1rem">/api/v1/predict/virality — Predicts how viral a piece of misinformation will become. Uses Qdrant cluster size (how many similar claims already exist), verdict type amplification, and risk score. Returns: virality score 0–1, predicted reach, and spread velocity estimate.</p>
+
+        <label>CLAIM</label>
+        <input type="text" id="viralClaim" placeholder="e.g. 5G towers spread COVID-19">
+        <label>VERDICT</label>
+        <select id="viralVerdict">
+          <option value="FAKE">FAKE</option>
+          <option value="MISLEADING">MISLEADING</option>
+          <option value="UNVERIFIED">UNVERIFIED</option>
+          <option value="TRUE">TRUE</option>
+        </select>
+        <label>RISK SCORE (0–100)</label>
+        <input type="text" id="viralRisk" value="85" placeholder="0-100">
+
+        <button class="btn btn-primary" onclick="runVirality()">▶ Predict Virality</button>
+        <div class="loader" id="viralLoader"><div class="spinner"></div>Predicting...</div>
+        <div class="error-box" id="viralError"></div>
+        <div class="result-panel" id="viralResult"><div id="viralResultContent"></div></div>
+      </div>
+    </div>
+
+    <!-- Network -->
+    <div class="card">
+      <div class="card-inner">
+        <div class="feature-badges"><span class="badge badge-post">POST</span><span class="badge badge-unique">Unique</span></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:6px">🕸️ Narrative Network Analysis</div>
+        <p class="section-desc" style="margin-bottom:1rem">/api/v1/network — Maps semantically similar claims in Qdrant to reveal whether a claim is part of a coordinated disinformation campaign or an isolated incident. Returns similar claims, a cluster ID, and a narrative family classification.</p>
+
+        <label>CLAIM TO MAP</label>
+        <input type="text" id="networkClaim" placeholder="e.g. vaccines cause autism in children">
+        <label>NUMBER OF SIMILAR CLAIMS TO FIND</label>
+        <input type="text" id="networkTopK" value="5" placeholder="1-20">
+
+        <button class="btn btn-primary" onclick="runNetwork()">▶ Map Network</button>
+        <div class="loader" id="networkLoader"><div class="spinner"></div>Mapping cluster...</div>
+        <div class="error-box" id="networkError"></div>
+        <div class="result-panel" id="networkResult"><div id="networkResultContent"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main-container -->
+
+<footer>
+  VeriFactAI — AI Against Misinformation &nbsp;|&nbsp; CodeWizards 2.0 &nbsp;|&nbsp; SRMIST Delhi-NCR &nbsp;|&nbsp; API: <span id="footerApi">http://localhost:8000/api/v1</span>
+</footer>
+
+<script>
+const API = 'http://localhost:8000/api/v1';
+
+// ── Health check ──────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch('http://localhost:8000/health');
+    const d = await r.json();
+    const dot = document.getElementById('statusDot');
+    const txt = document.getElementById('statusText');
+    if (d.status === 'ok') {
+      dot.classList.add('online');
+      txt.textContent = 'API online';
+    } else {
+      txt.textContent = 'API error';
+    }
+  } catch {
+    document.getElementById('statusText').textContent = 'API offline';
+  }
+}
+checkHealth();
+setInterval(checkHealth, 30000);
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function show(id) { document.getElementById(id).style.display = 'flex'; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+function showResult(id) { document.getElementById(id).classList.add('visible'); }
+function hideResult(id) { document.getElementById(id).classList.remove('visible'); }
+function showErr(id, msg) { const e = document.getElementById(id); e.textContent = msg; e.classList.add('visible'); }
+function hideErr(id) { document.getElementById(id).classList.remove('visible'); }
+
+function riskColor(score) {
+  if (score <= 30) return '#00ff9d';
+  if (score <= 60) return '#ffb340';
+  if (score <= 80) return '#ff9040';
+  return '#ff3d6b';
+}
+
+function riskLabel(score) {
+  if (score <= 30) return 'LOW';
+  if (score <= 60) return 'MEDIUM';
+  if (score <= 80) return 'HIGH';
+  return 'CRITICAL';
+}
+
+function verdictIcon(v) {
+  return { FAKE:'✕', TRUE:'✓', MISLEADING:'⚠', UNVERIFIED:'?', SATIRE:'~' }[v] || '?';
+}
+
+function jsonToggle(id) {
+  const el = document.getElementById(id);
+  if (el.style.display === 'block') { el.style.display = 'none'; } else { el.style.display = 'block'; }
+}
+
+function fileSelected(type) {
+  const file = document.getElementById(type+'File').files[0];
+  if (file) {
+    const drop = document.getElementById(type+'Drop');
+    drop.classList.add('has-file');
+    document.getElementById(type+'DropText').textContent = '✓ ' + file.name;
+  }
+}
+
+const samples = {
+  fake: '5G towers spread COVID-19 by activating the virus through electromagnetic radiation. Scientists have confirmed this link.',
+  true: 'India\'s Chandrayaan-3 successfully landed near the south pole of the Moon in August 2023.',
+  hindi: 'भारत सरकार ने अगले सोमवार से सभी 500 रुपये के नोट बंद करने का ऐलान किया है। RBI ने इसकी पुष्टि की है।'
+};
+
+function fillSample(section, type) {
+  document.getElementById('analyzeText').value = samples[type];
+  if (type === 'hindi') document.getElementById('analyzeLang').value = 'hi';
+}
+
+// ── Render full analysis response ─────────────────────────────────────────────
+function renderAnalysisResponse(data, containerId) {
+  const fc = data.fact_check || {};
+  const verdict = fc.verdict || 'UNVERIFIED';
+  const risk = data.risk_score || 0;
+  const signals = data.detection_signals || {};
+  const expl = data.explainability || {};
+  const counter = data.counter_narrative || {};
+  const claim = data.claim || {};
+  const topFeatures = (expl.top_features || []).slice(0, 5);
+  const jsonId = 'json_' + Math.random().toString(36).slice(2);
+
+  const signalSVal = (v, invert) => {
+    const num = invert ? (1 - (v || 0)) : (v || 0);
+    const pct = Math.round(num * 100);
+    const col = num > 0.6 ? '#ff3d6b' : num > 0.35 ? '#ffb340' : '#00ff9d';
+    return `<span class="signal-val" style="color:${col}">${pct}%</span>`;
+  };
+
+  let issuesHtml = '';
+  if (counter.inconsistencies && counter.inconsistencies.length) {
+    issuesHtml = '<ul class="issue-list">' + counter.inconsistencies.map(i => `<li>${i}</li>`).join('') + '</ul>';
+  }
+
+  let featuresHtml = '';
+  const maxF = topFeatures.length ? Math.max(...topFeatures.map(f => f.contribution || 0)) : 1;
+  topFeatures.forEach(f => {
+    const pct = maxF > 0 ? ((f.contribution || 0) / maxF * 100) : 0;
+    featuresHtml += `
+      <div class="explain-row">
+        <span class="explain-label">${(f.feature||'').replace(/_/g,' ')}</span>
+        <div class="explain-track"><div class="explain-fill" style="width:${pct}%"></div></div>
+        <span class="explain-val">${(f.contribution||0).toFixed(1)}</span>
+      </div>`;
+  });
+
+  let sourcesHtml = (fc.sources || []).map(s => `<span style="font-family:var(--font-mono);font-size:11px;background:var(--surface2);border:1px solid var(--border);padding:2px 10px;border-radius:6px;color:var(--muted)">${s}</span>`).join('');
+
+  const html = `
+    <div class="verdict-big verdict-${verdict}">
+      <span>${verdictIcon(verdict)}</span>
+      <span>${verdict}</span>
+      <span style="font-size:12px;opacity:.6">${Math.round((fc.confidence||0)*100)}% confidence</span>
+    </div>
+    ${data.detected_language && data.detected_language !== 'en' ? `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:.75rem">Detected language: <span style="color:var(--cyan)">${data.detected_language.toUpperCase()}</span> → translated to English for analysis</div>` : ''}
+    ${data.cached ? '<div style="font-family:var(--font-mono);font-size:11px;color:var(--green);margin-bottom:.75rem">⚡ Served from Qdrant cache</div>' : ''}
+
+    <div class="info-grid">
+      <div class="info-cell"><div class="val" style="color:${riskColor(risk)}">${risk}</div><div class="lbl">Risk score (0–100)</div></div>
+      <div class="info-cell"><div class="val" style="color:${riskColor(risk)}">${riskLabel(risk)}</div><div class="lbl">Risk level</div></div>
+      <div class="info-cell"><div class="val">${claim.claim_type || 'general'}</div><div class="lbl">Claim type</div></div>
+      <div class="info-cell"><div class="val">${Math.round(data.processing_time_ms || 0)}ms</div><div class="lbl">Processing time</div></div>
+    </div>
+
+    <div class="risk-container">
+      <div class="risk-label-row"><span>Risk score</span><span style="color:${riskColor(risk)}">${risk}/100 — ${riskLabel(risk)}</span></div>
+      <div class="risk-track"><div class="risk-fill" style="width:${risk}%;background:${riskColor(risk)}"></div></div>
+    </div>
+
+    ${claim.claim ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin:.75rem 0;font-family:var(--font-mono);font-size:12px;color:var(--muted)">Extracted claim: <span style="color:var(--text)">"${claim.claim}"</span></div>` : ''}
+
+    ${fc.explanation ? `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:.75rem">${fc.explanation}</div>` : ''}
+
+    ${sourcesHtml ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem">${sourcesHtml}</div>` : ''}
+
+    ${counter.summary ? `
+    <div class="counter-card">
+      <div class="counter-title">Counter-Narrative</div>
+      <div class="counter-text">${counter.summary}</div>
+      ${issuesHtml}
+      ${counter.verified_alternative ? `<div style="margin-top:.75rem;font-family:var(--font-mono);font-size:12px;color:var(--green)">✓ ${counter.verified_alternative}</div>` : ''}
+      ${counter.advice ? `<div style="margin-top:.5rem;font-family:var(--font-mono);font-size:12px;color:var(--amber)">→ ${counter.advice}</div>` : ''}
+    </div>` : ''}
+
+    ${signals ? `
+    <div style="margin-top:1rem">
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:.5rem">Detection signals</div>
+      <div class="signals-grid">
+        <div class="signal-box"><span class="signal-name">AI-generated text</span>${signalSVal(signals.ai_generated_prob, false)}</div>
+        <div class="signal-box"><span class="signal-name">Deepfake probability</span>${signalSVal(signals.deepfake_prob, false)}</div>
+        <div class="signal-box"><span class="signal-name">Source credibility</span>${signalSVal(signals.source_credibility, false)}</div>
+        <div class="signal-box"><span class="signal-name">NLI false prob</span>${signalSVal(signals.nli_false_prob, false)}</div>
+      </div>
+    </div>` : ''}
+
+    ${featuresHtml ? `
+    <div style="margin-top:1rem">
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:.5rem">Risk score attribution</div>
+      ${featuresHtml}
+    </div>` : ''}
+
+    <button class="json-toggle" onclick="jsonToggle('${jsonId}')">{ } Raw JSON response ▾</button>
+    <pre class="raw-json" id="${jsonId}">${JSON.stringify(data, null, 2)}</pre>
+  `;
+
+  document.getElementById(containerId).innerHTML = html;
+  setTimeout(() => {
+    document.querySelectorAll('.risk-fill').forEach(el => el.style.width = el.style.width);
+  }, 50);
+}
+
+// ── Section 1: Text analyze ───────────────────────────────────────────────────
+async function runAnalyze() {
+  const text = document.getElementById('analyzeText').value.trim();
+  if (!text) return;
+  hideErr('analyzeError');
+  show('analyzeLoader');
+  hideResult('analyzeResult');
+  try {
+    const r = await fetch(`${API}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, target_language: document.getElementById('analyzeLang').value, include_counter: true })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    renderAnalysisResponse(d, 'analyzeResultContent');
+    showResult('analyzeResult');
+  } catch(e) {
+    showErr('analyzeError', 'Error: ' + e.message);
+  } finally { hide('analyzeLoader'); }
+}
+
+// ── Section 2: URL analyze ────────────────────────────────────────────────────
+async function runUrlAnalyze() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+  hideErr('urlError');
+  show('urlLoader');
+  hideResult('urlResult');
+  try {
+    const r = await fetch(`${API}/analyze/url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, target_language: document.getElementById('urlLang').value })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    renderAnalysisResponse(d, 'urlResultContent');
+    showResult('urlResult');
+  } catch(e) {
+    showErr('urlError', 'Error: ' + e.message);
+  } finally { hide('urlLoader'); }
+}
+
+// ── Section 3: Batch ──────────────────────────────────────────────────────────
+async function runBatch() {
+  const raw = document.getElementById('batchText').value.trim();
+  const texts = raw.split('\n').map(t=>t.trim()).filter(Boolean).slice(0, 5);
+  if (!texts.length) return;
+  hideErr('batchError');
+  show('batchLoader');
+  hideResult('batchResult');
+  try {
+    const r = await fetch(`${API}/analyze/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texts, target_language: document.getElementById('batchLang').value })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    let html = `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:1rem">${d.total} claims analysed in ${Math.round(d.processing_time_ms)}ms</div>`;
+    (d.results || []).forEach((item, i) => {
+      const fc = item.fact_check || {};
+      const verdict = fc.verdict || 'UNVERIFIED';
+      html += `
+        <div style="border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:.75rem;background:var(--surface2)">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:.5rem">
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">#${i+1}</span>
+            <span class="verdict-big verdict-${verdict}" style="padding:4px 12px;font-size:13px;margin-bottom:0">${verdictIcon(verdict)} ${verdict}</span>
+            <span style="font-family:var(--font-mono);font-size:12px;color:${riskColor(item.risk_score || 0)}">${item.risk_score || 0}/100</span>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--text);line-height:1.5">"${(item.claim || {}).claim || item.original_text || ''}"</div>
+        </div>`;
+    });
+    document.getElementById('batchResultContent').innerHTML = html;
+    showResult('batchResult');
+  } catch(e) {
+    showErr('batchError', 'Error: ' + e.message);
+  } finally { hide('batchLoader'); }
+}
+
+// ── Section 4: Multimodal ─────────────────────────────────────────────────────
+function updateImageMode() {
+  const cap = document.getElementById('imageCaption').value.trim();
+  const modeText = document.getElementById('imageModeText');
+  const indicator = document.getElementById('imageModeIndicator');
+  if (cap) {
+    modeText.textContent = 'Deepfake scan + fact-check caption';
+    indicator.style.background = 'rgba(255,179,64,0.06)';
+    indicator.style.borderColor = 'rgba(255,179,64,0.3)';
+    indicator.style.color = 'var(--amber)';
+  } else {
+    modeText.textContent = 'Deepfake-only scan';
+    indicator.style.background = 'rgba(0,229,255,0.06)';
+    indicator.style.borderColor = 'rgba(0,229,255,0.2)';
+    indicator.style.color = 'var(--cyan)';
+  }
+}
+
+function renderDeepfakeOnlyResponse(d, containerId) {
+  const fc = d.fact_check || {};
+  const signals = d.detection_signals || {};
+  const dfProb = Math.round((signals.deepfake_prob || 0) * 100);
+  const authProb = 100 - dfProb;
+  const claimType = (d.claim || {}).claim_type || '';
+  const isDeepfakeOnly = claimType === 'deepfake_detection';
+
+  if (!isDeepfakeOnly) {
+    renderAnalysisResponse(d, containerId);
+    return;
+  }
+
+  const col = dfProb >= 65 ? 'var(--red)' : dfProb >= 35 ? 'var(--amber)' : 'var(--green)';
+  const verdict = dfProb >= 65 ? 'LIKELY DEEPFAKE' : dfProb <= 35 ? 'LIKELY AUTHENTIC' : 'UNCERTAIN';
+  const verdictClass = dfProb >= 65 ? 'FAKE' : dfProb <= 35 ? 'TRUE' : 'MISLEADING';
+  const counter = d.counter_narrative || {};
+  const issues = counter.inconsistencies || [];
+  const jsonId = 'json_df_' + Math.random().toString(36).slice(2);
+
+  document.getElementById(containerId).innerHTML = `
+    <div style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.75rem">
+      Deepfake-only analysis — no caption provided
+    </div>
+
+    <div class="verdict-big verdict-${verdictClass}" style="margin-bottom:1rem">
+      <span>${dfProb >= 65 ? '✕' : dfProb <= 35 ? '✓' : '?'}</span>
+      <span>${verdict}</span>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-cell">
+        <div class="val" style="color:${col};font-size:28px">${dfProb}%</div>
+        <div class="lbl">Deepfake probability</div>
+      </div>
+      <div class="info-cell">
+        <div class="val" style="color:var(--green);font-size:28px">${authProb}%</div>
+        <div class="lbl">Authentic probability</div>
+      </div>
+      <div class="info-cell">
+        <div class="val">${d.risk_score || 0}/100</div>
+        <div class="lbl">Risk score</div>
+      </div>
+      <div class="info-cell">
+        <div class="val">${Math.round(d.processing_time_ms || 0)}ms</div>
+        <div class="lbl">Processing time</div>
+      </div>
+    </div>
+
+    <div class="risk-container" style="margin:.75rem 0">
+      <div class="risk-label-row">
+        <span>Deepfake probability</span>
+        <span style="color:${col}">${dfProb}%</span>
+      </div>
+      <div class="risk-track">
+        <div class="risk-fill" style="width:${dfProb}%;background:${col}"></div>
+      </div>
+    </div>
+
+    <div class="counter-card" style="margin-top:.75rem">
+      <div class="counter-title">Analysis result</div>
+      <div class="counter-text">${fc.explanation || counter.summary || ''}</div>
+      ${issues.length ? '<ul class="issue-list">' + issues.map(i => '<li>' + i + '</li>').join('') + '</ul>' : ''}
+      ${counter.advice ? '<div style="margin-top:.75rem;font-family:var(--font-mono);font-size:12px;color:var(--amber)">→ ' + counter.advice + '</div>' : ''}
+    </div>
+
+    <div style="margin-top:1rem;padding:.75rem 1rem;background:var(--surface2);border:1px dashed var(--border2);border-radius:10px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">
+      Want to fact-check a claim about this image? Enter a caption above and re-run the analysis.
+    </div>
+
+    <button class="json-toggle" onclick="jsonToggle('${jsonId}')">{ } Raw JSON response ▾</button>
+    <pre class="raw-json" id="${jsonId}">${JSON.stringify(d, null, 2)}</pre>
+  `;
+}
+
+async function runImageAnalyze() {
+  const file = document.getElementById('imageFile').files[0];
+  if (!file) return showErr('imageError', 'Please select an image file first.');
+  hideErr('imageError');
+  show('imageLoader');
+  hideResult('imageResult');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('caption', document.getElementById('imageCaption').value);
+    fd.append('target_language', document.getElementById('imageLang').value);
+    const r = await fetch(`${API}/analyze/image`, { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    // Use smart renderer — detects deepfake-only vs full pipeline response
+    renderDeepfakeOnlyResponse(d, 'imageResultContent');
+    showResult('imageResult');
+  } catch(e) { showErr('imageError', 'Error: ' + e.message); }
+  finally { hide('imageLoader'); }
+}
+
+async function runAudioAnalyze() {
+  const file = document.getElementById('audioFile').files[0];
+  if (!file) return showErr('audioError', 'Please select an audio file first.');
+  hideErr('audioError');
+  show('audioLoader');
+  hideResult('audioResult');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('target_language', document.getElementById('audioLang').value);
+    const r = await fetch(`${API}/analyze/audio`, { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    renderAnalysisResponse(d, 'audioResultContent');
+    showResult('audioResult');
+  } catch(e) { showErr('audioError', 'Error: ' + e.message); }
+  finally { hide('audioLoader'); }
+}
+
+async function runVideoAnalyze() {
+  const file = document.getElementById('videoFile').files[0];
+  if (!file) return showErr('videoError', 'Please select a video file first.');
+  hideErr('videoError');
+  show('videoLoader');
+  hideResult('videoResult');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('caption', document.getElementById('videoCaption').value);
+    fd.append('target_language', document.getElementById('videoLang').value);
+    const r = await fetch(`${API}/analyze/video`, { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    renderAnalysisResponse(d, 'videoResultContent');
+    showResult('videoResult');
+  } catch(e) { showErr('videoError', 'Error: ' + e.message); }
+  finally { hide('videoLoader'); }
+}
+
+async function runDeepfake() {
+  const file = document.getElementById('deepfakeFile').files[0];
+  if (!file) return showErr('deepfakeError', 'Please select an image first.');
+  hideErr('deepfakeError');
+  show('deepfakeLoader');
+  hideResult('deepfakeResult');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch(`${API}/detect/deepfake`, { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    const prob = Math.round((d.deepfake_probability || 0) * 100);
+    const col = prob >= 60 ? 'var(--red)' : prob <= 35 ? 'var(--green)' : 'var(--amber)';
+    document.getElementById('deepfakeResultContent').innerHTML = `
+      <div class="verdict-big verdict-${prob >= 60 ? 'FAKE' : prob <= 35 ? 'TRUE' : 'MISLEADING'}" style="margin-bottom:1rem">
+        ${d.verdict}
+      </div>
+      <div class="info-grid">
+        <div class="info-cell"><div class="val" style="color:${col}">${prob}%</div><div class="lbl">Deepfake probability</div></div>
+        <div class="info-cell"><div class="val" style="color:var(--green)">${100-prob}%</div><div class="lbl">Authentic probability</div></div>
+        <div class="info-cell"><div class="val">${Math.round((d.confidence||0)*100)}%</div><div class="lbl">Model confidence</div></div>
+      </div>
+      <div class="risk-container">
+        <div class="risk-label-row"><span>Deepfake probability</span><span style="color:${col}">${prob}%</span></div>
+        <div class="risk-track"><div class="risk-fill" style="width:${prob}%;background:${col}"></div></div>
+      </div>`;
+    showResult('deepfakeResult');
+  } catch(e) { showErr('deepfakeError', 'Error: ' + e.message); }
+  finally { hide('deepfakeLoader'); }
+}
+
+async function runAiText() {
+  const text = document.getElementById('aiTextInput').value.trim();
+  if (!text) return;
+  hideErr('aiTextError');
+  show('aiTextLoader');
+  hideResult('aiTextResult');
+  try {
+    const r = await fetch(`${API}/detect/ai-text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    const aiPct = Math.round((d.ai_generated_probability || 0) * 100);
+    const humanPct = Math.round((d.human_probability || 0) * 100);
+    const col = aiPct >= 60 ? 'var(--red)' : aiPct <= 35 ? 'var(--green)' : 'var(--amber)';
+    document.getElementById('aiTextResultContent').innerHTML = `
+      <div class="verdict-big verdict-${aiPct >= 60 ? 'FAKE' : aiPct <= 35 ? 'TRUE' : 'UNVERIFIED'}" style="margin-bottom:1rem">${d.label}</div>
+      <div class="info-grid">
+        <div class="info-cell"><div class="val" style="color:${col}">${aiPct}%</div><div class="lbl">AI-generated probability</div></div>
+        <div class="info-cell"><div class="val" style="color:var(--green)">${humanPct}%</div><div class="lbl">Human-written probability</div></div>
+      </div>
+      <div class="risk-container">
+        <div class="risk-label-row"><span>AI probability</span><span style="color:${col}">${aiPct}%</span></div>
+        <div class="risk-track"><div class="risk-fill" style="width:${aiPct}%;background:${col}"></div></div>
+      </div>`;
+    showResult('aiTextResult');
+  } catch(e) { showErr('aiTextError', 'Error: ' + e.message); }
+  finally { hide('aiTextLoader'); }
+}
+
+// ── Section 5: Fact check ─────────────────────────────────────────────────────
+async function runFactCheck() {
+  const claim = document.getElementById('factText').value.trim();
+  if (!claim) return;
+  hideErr('factError');
+  show('factLoader');
+  hideResult('factResult');
+  try {
+    const r = await fetch(`${API}/fact-check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ claim, language: document.getElementById('factLang').value })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    const verdict = d.verdict || 'UNVERIFIED';
+    const conf = Math.round((d.confidence || 0) * 100);
+    const jsonId = 'json_fc_' + Math.random().toString(36).slice(2);
+    let srcHtml = (d.sources || []).map(s => `<span style="font-family:var(--font-mono);font-size:11px;background:var(--surface2);border:1px solid var(--border);padding:2px 10px;border-radius:6px;color:var(--muted)">${s}</span>`).join('');
+    document.getElementById('factResultContent').innerHTML = `
+      <div class="verdict-big verdict-${verdict}">${verdictIcon(verdict)} ${verdict} — ${conf}% confidence</div>
+      ${d.explanation ? `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:.75rem">${d.explanation}</div>` : ''}
+      ${srcHtml ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.75rem">${srcHtml}</div>` : ''}
+      ${(d.fact_check_urls||[]).length ? `<div style="font-family:var(--font-mono);font-size:11px;color:var(--cyan)">${d.fact_check_urls.map(u=>`<a href="${u}" target="_blank" style="color:var(--cyan)">${u}</a>`).join('<br>')}</div>` : ''}
+      <button class="json-toggle" onclick="jsonToggle('${jsonId}')">{ } Raw JSON ▾</button>
+      <pre class="raw-json" id="${jsonId}">${JSON.stringify(d, null, 2)}</pre>`;
+    showResult('factResult');
+  } catch(e) { showErr('factError', 'Error: ' + e.message); }
+  finally { hide('factLoader'); }
+}
+
+async function runFactSources() {
+  show('factSourcesLoader');
+  try {
+    const r = await fetch(`${API}/fact-check/sources`);
+    const d = await r.json();
+    const sources = d.sources || [];
+    let html = '<div class="sources-grid">';
+    sources.forEach(s => {
+      html += `
+        <div class="source-item">
+          <div class="priority-badge">Priority ${s.priority}</div>
+          <div class="source-name">${s.name}</div>
+          <div class="source-desc">${s.description}</div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--purple);margin-top:4px">${s.type}</div>
+        </div>`;
+    });
+    html += '</div>';
+    document.getElementById('factSourcesContent').innerHTML = html;
+    document.getElementById('factSourcesResult').classList.add('visible');
+  } catch(e) {}
+  finally { hide('factSourcesLoader'); }
+}
+
+// ── Section 6: Counter ────────────────────────────────────────────────────────
+async function runCounter() {
+  const claim = document.getElementById('counterClaim').value.trim();
+  if (!claim) return;
+  hideErr('counterError');
+  show('counterLoader');
+  hideResult('counterResult');
+  try {
+    const srcsRaw = document.getElementById('counterSources').value;
+    const sources = srcsRaw ? srcsRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
+    const r = await fetch(`${API}/counter`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ claim, verdict: document.getElementById('counterVerdict').value, sources, target_language: document.getElementById('counterLang').value })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    let issuesHtml = '';
+    if (d.inconsistencies && d.inconsistencies.length) {
+      issuesHtml = '<ul class="issue-list">' + d.inconsistencies.map(i=>`<li>${i}</li>`).join('') + '</ul>';
+    }
+    let citsHtml = (d.citations||[]).map(c=>`<span style="font-family:var(--font-mono);font-size:11px;background:var(--surface2);border:1px solid var(--border);padding:2px 10px;border-radius:6px;color:var(--muted)">${c}</span>`).join('');
+    const jsonId = 'json_ct_' + Math.random().toString(36).slice(2);
+    document.getElementById('counterResultContent').innerHTML = `
+      <div class="counter-card">
+        <div class="counter-title">Summary</div>
+        <div class="counter-text">${d.summary || ''}</div>
+      </div>
+      ${issuesHtml ? `<div class="counter-card" style="margin-top:.5rem"><div class="counter-title">Inconsistencies found</div>${issuesHtml}</div>` : ''}
+      ${d.verified_alternative ? `<div class="counter-card" style="margin-top:.5rem;border-color:rgba(0,255,157,0.2);background:rgba(0,255,157,0.03)"><div class="counter-title" style="color:var(--green)">Verified alternative</div><div class="counter-text">${d.verified_alternative}</div></div>` : ''}
+      ${d.advice ? `<div class="counter-card" style="margin-top:.5rem;border-color:rgba(255,179,64,0.2);background:rgba(255,179,64,0.03)"><div class="counter-title" style="color:var(--amber)">Advice</div><div class="counter-text">${d.advice}</div></div>` : ''}
+      ${citsHtml ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:.75rem">${citsHtml}</div>` : ''}
+      <button class="json-toggle" onclick="jsonToggle('${jsonId}')">{ } Raw JSON ▾</button>
+      <pre class="raw-json" id="${jsonId}">${JSON.stringify(d, null, 2)}</pre>`;
+    showResult('counterResult');
+  } catch(e) { showErr('counterError', 'Error: ' + e.message); }
+  finally { hide('counterLoader'); }
+}
+
+async function runCounterTemplates() {
+  show('counterTplLoader');
+  try {
+    const r = await fetch(`${API}/counter/templates`);
+    const d = await r.json();
+    const tpls = d.templates || [];
+    const verdictColors = { FAKE:'var(--red)', MISLEADING:'var(--amber)', TRUE:'var(--green)', UNVERIFIED:'var(--muted)', SATIRE:'var(--purple)' };
+    let html = '<div class="sources-grid">';
+    tpls.forEach(t => {
+      html += `
+        <div class="template-item">
+          <div>
+            <div class="verdict-big verdict-${t.verdict}" style="padding:3px 10px;font-size:12px;margin-bottom:6px;display:inline-flex">${verdictIcon(t.verdict)} ${t.verdict}</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);line-height:1.5">${t.summary}</div>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);flex-shrink:0">${(t.languages||[]).join(' · ')}</div>
+        </div>`;
+    });
+    html += '</div>';
+    document.getElementById('counterTplContent').innerHTML = html;
+    document.getElementById('counterTplResult').classList.add('visible');
+  } catch(e) {}
+  finally { hide('counterTplLoader'); }
+}
+
+// ── Section 7: Trending ────────────────────────────────────────────────────────
+async function runTrending() {
+  hideErr('trendingError');
+  show('trendingLoader');
+  hideResult('trendingResult');
+  const limit = document.getElementById('trendingLimit').value || 10;
+  try {
+    const r = await fetch(`${API}/trending?limit=${limit}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    const items = d.trending || [];
+    if (!items.length) {
+      document.getElementById('trendingResultContent').innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:1rem 0">No trending claims yet. Run some /analyze calls first to populate the Qdrant cache.</div>`;
+    } else {
+      const verdictColors = { FAKE:'var(--red)', MISLEADING:'var(--amber)', TRUE:'var(--green)', UNVERIFIED:'var(--muted)' };
+      let html = `
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:.75rem">${d.total_indexed} total claims indexed in Qdrant</div>
+        <div class="trend-hdr"><span>Claim</span><span style="text-align:right">Verdict</span><span style="text-align:right">Hits</span><span style="text-align:right">Risk</span></div>`;
+      items.forEach(item => {
+        const col = verdictColors[item.verdict] || 'var(--muted)';
+        const risk = item.risk_score || 0;
+        html += `<div class="trend-item">
+          <span class="trend-claim">${item.claim || ''}</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:${col};text-align:right">${item.verdict}</span>
+          <span class="trend-hits">${item.hit_count || 1}</span>
+          <span class="trend-score" style="color:${riskColor(risk)}">${risk}</span>
+        </div>`;
+      });
+      document.getElementById('trendingResultContent').innerHTML = html;
+    }
+    showResult('trendingResult');
+  } catch(e) { showErr('trendingError', 'Error: ' + e.message); }
+  finally { hide('trendingLoader'); }
+}
+
+async function runStats() {
+  try {
+    const r = await fetch(`${API}/stats`);
+    const d = await r.json();
+    const vd = d.verdict_distribution || {};
+    const catHtml = Object.entries(d.top_categories || {}).map(([k,v]) => `<span style="font-family:var(--font-mono);font-size:11px;background:var(--surface2);border:1px solid var(--border);padding:2px 10px;border-radius:6px;color:var(--muted)">${k}: ${v}</span>`).join('');
+    document.getElementById('statsContent').innerHTML = `
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:.5rem">
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:.75rem">System stats</div>
+        <div class="info-grid">
+          <div class="info-cell"><div class="val">${d.total_claims_indexed || 0}</div><div class="lbl">Claims indexed</div></div>
+          <div class="info-cell"><div class="val">${d.total_sources_indexed || 0}</div><div class="lbl">Sources indexed</div></div>
+          ${Object.entries(vd).map(([k,v])=>`<div class="info-cell"><div class="val" style="font-size:14px">${v}</div><div class="lbl">${k}</div></div>`).join('')}
+        </div>
+        ${catHtml ? `<div style="margin-top:.75rem;display:flex;gap:6px;flex-wrap:wrap">${catHtml}</div>` : ''}
+      </div>`;
+    document.getElementById('statsResult').classList.add('visible');
+  } catch(e) {}
+}
+
+// ── Section 8: Virality & Network ─────────────────────────────────────────────
+async function runVirality() {
+  const claim = document.getElementById('viralClaim').value.trim();
+  if (!claim) return;
+  hideErr('viralError');
+  show('viralLoader');
+  hideResult('viralResult');
+  try {
+    const r = await fetch(`${API}/predict/virality`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ claim, verdict: document.getElementById('viralVerdict').value, risk_score: parseInt(document.getElementById('viralRisk').value) || 50 })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    const score = d.virality_score || 0;
+    const pct = Math.round(score * 100);
+    const col = pct >= 70 ? 'var(--red)' : pct >= 40 ? 'var(--amber)' : 'var(--green)';
+    const jsonId = 'json_vr_' + Math.random().toString(36).slice(2);
+    document.getElementById('viralResultContent').innerHTML = `
+      <div class="virality-display">
+        <div class="virality-score-big" style="color:${col}">${pct}%</div>
+        <div class="virality-label">Virality score</div>
+      </div>
+      <div class="risk-container">
+        <div class="risk-track"><div class="risk-fill" style="width:${pct}%;background:${col}"></div></div>
+      </div>
+      <div class="info-grid" style="margin-top:.75rem">
+        <div class="info-cell"><div class="val" style="font-size:13px;color:${col}">${d.predicted_reach || '-'}</div><div class="lbl">Predicted reach</div></div>
+        <div class="info-cell"><div class="val" style="font-size:13px">${d.spread_velocity || '-'}</div><div class="lbl">Spread velocity</div></div>
+        <div class="info-cell"><div class="val">${d.risk_amplification || '-'}×</div><div class="lbl">Risk amplification</div></div>
+      </div>
+      <button class="json-toggle" onclick="jsonToggle('${jsonId}')">{ } Raw JSON ▾</button>
+      <pre class="raw-json" id="${jsonId}">${JSON.stringify(d, null, 2)}</pre>`;
+    showResult('viralResult');
+  } catch(e) { showErr('viralError', 'Error: ' + e.message); }
+  finally { hide('viralLoader'); }
+}
+
+async function runNetwork() {
+  const claim = document.getElementById('networkClaim').value.trim();
+  if (!claim) return;
+  hideErr('networkError');
+  show('networkLoader');
+  hideResult('networkResult');
+  try {
+    const r = await fetch(`${API}/network`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ claim, top_k: parseInt(document.getElementById('networkTopK').value) || 5 })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    const similar = d.similar_claims || [];
+    const jsonId = 'json_nw_' + Math.random().toString(36).slice(2);
+    let html = `
+      <div style="background:var(--surface2);border:1px solid rgba(167,139,250,0.2);border-radius:10px;padding:10px 14px;margin-bottom:.75rem">
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--purple);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Narrative family</div>
+        <div style="font-family:var(--font-mono);font-size:13px;color:var(--text)">${d.narrative_family || 'Unknown'}</div>
+        ${d.cluster_id ? `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:4px">${d.cluster_id}</div>` : ''}
+      </div>`;
+    if (!similar.length) {
+      html += `<div style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">No similar claims found in Qdrant. Analyse some related claims first.</div>`;
+    } else {
+      html += '<div class="network-container">';
+      similar.forEach(s => {
+        const sim = Math.round((s.similarity || 0) * 100);
+        const verdictColors = { FAKE:'var(--red)', MISLEADING:'var(--amber)', TRUE:'var(--green)', UNVERIFIED:'var(--muted)' };
+        const col = verdictColors[s.verdict] || 'var(--muted)';
+        html += `<div class="network-item">
+          <div class="similarity-bar"><div class="similarity-fill" style="width:${sim}%"></div></div>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--purple);width:32px;flex-shrink:0">${sim}%</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:${col};flex-shrink:0">${s.verdict||'?'}</span>
+          <span style="font-size:12px;color:var(--muted);flex:1;line-height:1.4">${s.claim || ''}</span>
+        </div>`;
+      });
+      html += '</div>';
+    }
+    html += `<button class="json-toggle" onclick="jsonToggle('${jsonId}')">{ } Raw JSON ▾</button><pre class="raw-json" id="${jsonId}">${JSON.stringify(d, null, 2)}</pre>`;
+    document.getElementById('networkResultContent').innerHTML = html;
+    showResult('networkResult');
+  } catch(e) { showErr('networkError', 'Error: ' + e.message); }
+  finally { hide('networkLoader'); }
+}
+
+// ── Animate risk bars on load ─────────────────────────────────────────────────
+document.querySelectorAll('.risk-fill,.explain-fill').forEach(el => {
+  const target = el.style.width;
+  el.style.width = '0%';
+  setTimeout(() => { el.style.width = target; }, 100);
+});
+</script>
+</body>
+</html>
