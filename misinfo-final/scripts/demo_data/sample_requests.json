@@ -1,0 +1,109 @@
+{
+  "demo_requests": [
+    {
+      "name": "English Fake Health Claim",
+      "endpoint": "POST /api/v1/analyze",
+      "body": {
+        "text": "5G towers spread COVID-19 by activating the virus through electromagnetic radiation. Scientists have confirmed this link.",
+        "target_language": "en",
+        "include_counter": true
+      },
+      "expected_verdict": "FAKE",
+      "expected_risk_score_range": [85, 100]
+    },
+    {
+      "name": "Hindi Misinformation",
+      "endpoint": "POST /api/v1/analyze",
+      "body": {
+        "text": "भारत सरकार ने अगले सोमवार से सभी 500 रुपये के नोट बंद करने का ऐलान किया है। RBI ने इसकी पुष्टि की है।",
+        "target_language": "hi",
+        "include_counter": true
+      },
+      "expected_verdict": "FAKE",
+      "expected_risk_score_range": [75, 95]
+    },
+    {
+      "name": "Tamil Claim",
+      "endpoint": "POST /api/v1/analyze",
+      "body": {
+        "text": "இந்தியாவில் 5G நெட்வொர்க் கோவிட்-19 வைரஸை பரப்புகிறது என்று விஞ்ஞானிகள் கண்டுபிடித்தனர்.",
+        "target_language": "ta",
+        "include_counter": true
+      },
+      "expected_verdict": "FAKE"
+    },
+    {
+      "name": "Misleading Political Claim",
+      "endpoint": "POST /api/v1/analyze",
+      "body": {
+        "text": "Electronic voting machines in India are pre-programmed to favour the ruling party according to internal sources.",
+        "target_language": "en"
+      },
+      "expected_verdict": "MISLEADING"
+    },
+    {
+      "name": "True Claim (Chandrayaan)",
+      "endpoint": "POST /api/v1/analyze",
+      "body": {
+        "text": "India's Chandrayaan-3 successfully landed near the south pole of the Moon in August 2023.",
+        "target_language": "en"
+      },
+      "expected_verdict": "TRUE"
+    },
+    {
+      "name": "Direct Fact Check",
+      "endpoint": "POST /api/v1/fact-check",
+      "body": {
+        "claim": "Drinking hot water with lemon cures COVID-19",
+        "language": "en"
+      }
+    },
+    {
+      "name": "URL Analysis",
+      "endpoint": "POST /api/v1/analyze/url",
+      "body": {
+        "url": "https://www.bbc.com/news/world-asia-india",
+        "target_language": "en"
+      }
+    },
+    {
+      "name": "Counter Narrative Generation",
+      "endpoint": "POST /api/v1/counter",
+      "body": {
+        "claim": "COVID vaccines cause infertility in women",
+        "verdict": "FAKE",
+        "sources": ["WHO", "CDC", "ICMR"],
+        "target_language": "en"
+      }
+    },
+    {
+      "name": "AI Text Detection",
+      "endpoint": "POST /api/v1/detect/ai-text",
+      "body": {
+        "text": "In conclusion, it is important to note that this statement, while seemingly factual, may require further verification from credible sources. Furthermore, it should be noted that all claims must be evaluated based on available evidence."
+      }
+    },
+    {
+      "name": "Virality Prediction",
+      "endpoint": "POST /api/v1/predict/virality",
+      "body": {
+        "claim": "5G towers spread COVID-19 by activating the virus",
+        "verdict": "FAKE",
+        "risk_score": 94
+      }
+    },
+    {
+      "name": "Network Analysis",
+      "endpoint": "POST /api/v1/network",
+      "body": {
+        "claim": "vaccines cause autism in children",
+        "top_k": 5
+      }
+    },
+    {
+      "name": "Trending Misinformation",
+      "endpoint": "GET /api/v1/trending?limit=10",
+      "body": null
+    }
+  ]
+}
